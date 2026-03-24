@@ -2,8 +2,14 @@
 
 A 4-phase parallel development workflow for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that uses TDD with separated test and dev agents, dependency-aware task planning, and automated quality gates.
 
-```
-/spec  →  /swarm-plan  →  /swarm  →  /validate
+```mermaid
+graph LR
+    spec["/spec"] --> plan["/swarm-plan"] --> swarm["/swarm"] --> validate["/validate"]
+
+    style spec fill:#4a9eff,stroke:#2670c2,color:#fff
+    style plan fill:#4a9eff,stroke:#2670c2,color:#fff
+    style swarm fill:#4a9eff,stroke:#2670c2,color:#fff
+    style validate fill:#4a9eff,stroke:#2670c2,color:#fff
 ```
 
 ## What It Does
@@ -14,6 +20,69 @@ The swarm workflow turns feature requests into shipped code through four phases:
 2. **`/swarm-plan`** — Decomposes the spec into atomic tasks with an explicit dependency DAG, enabling maximum parallel execution
 3. **`/swarm`** — Executes tasks in parallel waves using **separated agents**: a Test Agent (Opus) writes failing tests, then a Dev Agent (Sonnet) implements until green. Regression gates run between waves.
 4. **`/validate`** — Full test matrix, regression check, cleanup, code review, documentation updates, and phase closure
+
+```mermaid
+flowchart TB
+    subgraph spec["Phase 1: /spec"]
+        s1["Orient\n2-3 questions"] --> s2["Explore\ncodebase"] --> s3["Deep dive\nAC, UX, risks"] --> s4["Generate\nspec doc"]
+    end
+
+    subgraph plan["Phase 2: /swarm-plan"]
+        p1["Research\narchitecture"] --> p2["Decompose into\natomic tasks"] --> p3["Build dependency\nDAG + waves"] --> p4["Subagent\nreview"]
+    end
+
+    subgraph swarm["Phase 3: /swarm"]
+        direction TB
+        subgraph wave["Each Wave"]
+            direction TB
+            subgraph task["Each Task"]
+                red["Test Agent\n(Opus, RED)\nWrite failing tests"]
+                green["Dev Agent\n(Sonnet, GREEN)\nImplement until green"]
+                red --> green
+            end
+            task --> gate{"Regression\ngate"}
+        end
+        gate -->|green| next["Next wave\nor final integration"]
+        gate -->|fail| fix["Fix agent\n(Sonnet)"] --> gate
+    end
+
+    subgraph val["Phase 4: /validate"]
+        v1["Full test\nmatrix"] --> v2["Regression\ncheck"] --> v3["Cleanup +\ncode review"] --> v4["Design review\n(optional)"] --> v5["Phase\nclosure"]
+    end
+
+    spec --> plan --> swarm -->|auto-chain\nvia Stop hook| val
+
+    adapter[("adapter.md\n(your config)")] -.->|read by| spec
+    adapter -.->|read by| plan
+    adapter -.->|read by| swarm
+    adapter -.->|read by| val
+
+    style spec fill:#1a1a2e,stroke:#4a9eff,color:#fff
+    style plan fill:#1a1a2e,stroke:#4a9eff,color:#fff
+    style swarm fill:#1a1a2e,stroke:#4a9eff,color:#fff
+    style val fill:#1a1a2e,stroke:#4a9eff,color:#fff
+    style wave fill:#16213e,stroke:#4a9eff,color:#fff
+    style task fill:#0f3460,stroke:#e94560,color:#fff
+    style red fill:#c0392b,stroke:#922b21,color:#fff
+    style green fill:#27ae60,stroke:#1e8449,color:#fff
+    style gate fill:#f39c12,stroke:#d68910,color:#fff
+    style fix fill:#e67e22,stroke:#ca6f1e,color:#fff
+    style next fill:#27ae60,stroke:#1e8449,color:#fff
+    style adapter fill:#8e44ad,stroke:#6c3483,color:#fff
+    style s1 fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style s2 fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style s3 fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style s4 fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style p1 fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style p2 fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style p3 fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style p4 fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style v1 fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style v2 fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style v3 fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style v4 fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style v5 fill:#2c3e50,stroke:#4a9eff,color:#fff
+```
 
 ### Why Agent Separation?
 
@@ -203,13 +272,19 @@ The validator runs through a 9-step checklist:
 
 ### The Adapter Pattern
 
-```
-┌─────────────┐     reads      ┌──────────────┐
-│   /spec     │───────────────→│              │
-│   /swarm-plan│───────────────→│  adapter.md  │
-│   /swarm    │───────────────→│  (your config)│
-│   /validate │───────────────→│              │
-└─────────────┘                └──────────────┘
+```mermaid
+flowchart LR
+    spec["/spec"] --> adapter
+    plan["/swarm-plan"] --> adapter
+    swarm["/swarm"] --> adapter
+    validate["/validate"] --> adapter
+    adapter[("adapter.md\n(your config)")]
+
+    style adapter fill:#8e44ad,stroke:#6c3483,color:#fff
+    style spec fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style plan fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style swarm fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style validate fill:#2c3e50,stroke:#4a9eff,color:#fff
 ```
 
 Skills are **generic** — they work for any project. The adapter is **specific** — it tells skills your test commands, file patterns, and conventions. This separation is what makes the workflow portable.
@@ -229,28 +304,37 @@ Skills are **generic** — they work for any project. The adapter is **specific*
 
 Three layers catch issues progressively:
 
-```
-Per-task          →  Scoped test runner (unit, integration, or E2E)
-Inter-wave        →  Full regression gate between parallel waves
-Final             →  Complete test matrix + E2E + design review
+```mermaid
+flowchart LR
+    pt["Per-task\nScoped test runner"] --> iw["Inter-wave\nFull regression gate"] --> final["Final\nComplete test matrix\n+ E2E + design review"]
+
+    style pt fill:#2c3e50,stroke:#f39c12,color:#fff
+    style iw fill:#2c3e50,stroke:#f39c12,color:#fff
+    style final fill:#2c3e50,stroke:#f39c12,color:#fff
 ```
 
 ### Command → Skill Architecture
 
 Commands are thin routers (2-3 lines). Skills contain the full process logic.
 
-```
-User types: /swarm auth-plan.md
-  ↓
-.claude/commands/swarm.md          (router — "read adapter, then read skill")
-  ↓
-.claude/adapter.md                 (project config — test commands, patterns)
-  ↓
-.claude/skills/swarm/SKILL.md      (full orchestration logic)
-  ├── Test Agent (Opus, RED)
-  ├── Dev Agent (Sonnet, GREEN)
-  ├── Regression Gate
-  └── Integration Pass
+```mermaid
+flowchart TD
+    user["/swarm auth-plan.md"] --> cmd["commands/swarm.md\n(router)"]
+    cmd --> adapter["adapter.md\n(project config)"]
+    cmd --> skill["skills/swarm/SKILL.md\n(orchestration logic)"]
+    skill --> red["Test Agent\n(Opus, RED)"]
+    skill --> green["Dev Agent\n(Sonnet, GREEN)"]
+    skill --> reggate["Regression Gate"]
+    skill --> integ["Integration Pass"]
+
+    style user fill:#4a9eff,stroke:#2670c2,color:#fff
+    style cmd fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style adapter fill:#8e44ad,stroke:#6c3483,color:#fff
+    style skill fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style red fill:#c0392b,stroke:#922b21,color:#fff
+    style green fill:#27ae60,stroke:#1e8449,color:#fff
+    style reggate fill:#f39c12,stroke:#d68910,color:#fff
+    style integ fill:#2c3e50,stroke:#4a9eff,color:#fff
 ```
 
 ### Hooks
