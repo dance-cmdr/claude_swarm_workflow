@@ -159,6 +159,38 @@ Project-specific configuration for [your project]. Referenced by workflow skills
 - **Inter-wave**: [your regression gate command from above]
 - **Final**: full test matrix including E2E if available
 
+## Executor Variants (Optional)
+
+<!--
+  Configure optional executor variants. These sections are read by the variant
+  skills if installed. If a section is missing, the variant uses sensible defaults.
+-->
+
+### Super-Swarm
+<!--
+  Rolling pool executor — launches tasks as slots free, no wave batching.
+  Install with: ./install.sh --with-super-swarm
+-->
+- **Max concurrent agents**: 12
+- **Regression gate frequency**: every 4 completed tasks
+
+### Co-Design
+<!--
+  Design-aware executor — classifies tasks as "design" or "standard".
+  Design tasks get full CLI access with design-system awareness.
+  Install with: ./install.sh --with-co-design
+-->
+- **Design task keywords**: CSS, HTML, React components, styling, UI, layout, design tokens, animations, accessibility, responsive
+- **Design tasks skip RED phase**: false
+
+### Spark
+<!--
+  Agent-profile executor — injects a named agent profile into all subagents.
+  Create your profile at .claude/agents/<name>.md, then reference it here.
+  Install with: ./install.sh --with-spark
+-->
+- **Agent profile**: [your-profile-name]
+
 ## Browser MCP (Optional — for Design Review)
 
 <!--
