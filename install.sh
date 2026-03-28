@@ -6,6 +6,10 @@ set -euo pipefail
 #
 # Options:
 #   --with-design-review   Include web-designer skill + .mcp.json
+#   --with-super-swarm     Include rolling pool executor (no wave batching)
+#   --with-tmux            Include tmux executor (live pane visibility)
+#   --with-co-design       Include design-aware executor (design/standard routing)
+#   --with-spark           Include agent-profile executor (persona injection)
 #   --with-cursor           Include .cursor/agents/ for Cursor IDE
 #   --force                 Overwrite existing adapter.md
 #   --help                  Show this help message
@@ -16,12 +20,20 @@ WORKFLOW_DIR="$SCRIPT_DIR/workflow"
 # Parse arguments
 TARGET=""
 WITH_DESIGN=false
+WITH_SUPER_SWARM=false
+WITH_TMUX=false
+WITH_CODESIGN=false
+WITH_SPARK=false
 WITH_CURSOR=false
 FORCE=false
 
 for arg in "$@"; do
   case "$arg" in
     --with-design-review) WITH_DESIGN=true ;;
+    --with-super-swarm) WITH_SUPER_SWARM=true ;;
+    --with-tmux) WITH_TMUX=true ;;
+    --with-co-design) WITH_CODESIGN=true ;;
+    --with-spark) WITH_SPARK=true ;;
     --with-cursor) WITH_CURSOR=true ;;
     --force) FORCE=true ;;
     --help)
@@ -40,7 +52,8 @@ for arg in "$@"; do
 done
 
 if [ -z "$TARGET" ]; then
-  echo "Usage: ./install.sh /path/to/your/project [--with-design-review] [--with-cursor] [--force]"
+  echo "Usage: ./install.sh /path/to/your/project [OPTIONS]"
+  echo "Run ./install.sh --help for all options."
   exit 1
 fi
 
@@ -110,6 +123,43 @@ if [ "$WITH_DESIGN" = true ]; then
   fi
 fi
 
+# Optional: super-swarm executor (rolling pool)
+if [ "$WITH_SUPER_SWARM" = true ]; then
+  echo "  Installing super-swarm executor..."
+  mkdir -p "$TARGET/.claude/skills/super-swarm"
+  cp "$WORKFLOW_DIR/.claude/skills/super-swarm/SKILL.md" "$TARGET/.claude/skills/super-swarm/SKILL.md"
+  cp "$WORKFLOW_DIR/.claude/commands/super-swarm.md" "$TARGET/.claude/commands/super-swarm.md"
+fi
+
+# Optional: tmux executor (live pane visibility)
+if [ "$WITH_TMUX" = true ]; then
+  echo "  Installing swarm-tmux executor..."
+  mkdir -p "$TARGET/.claude/skills/swarm-tmux"
+  cp "$WORKFLOW_DIR/.claude/skills/swarm-tmux/SKILL.md" "$TARGET/.claude/skills/swarm-tmux/SKILL.md"
+  cp "$WORKFLOW_DIR/.claude/commands/swarm-tmux.md" "$TARGET/.claude/commands/swarm-tmux.md"
+  cp "$WORKFLOW_DIR/.claude/hooks/tmux_spawn_worker.sh" "$TARGET/.claude/hooks/tmux_spawn_worker.sh"
+  chmod +x "$TARGET/.claude/hooks/tmux_spawn_worker.sh"
+fi
+
+# Optional: co-design executor (design/standard routing)
+if [ "$WITH_CODESIGN" = true ]; then
+  echo "  Installing co-design executor..."
+  mkdir -p "$TARGET/.claude/skills/co-design"
+  cp "$WORKFLOW_DIR/.claude/skills/co-design/SKILL.md" "$TARGET/.claude/skills/co-design/SKILL.md"
+  cp "$WORKFLOW_DIR/.claude/commands/co-design.md" "$TARGET/.claude/commands/co-design.md"
+  if [ ! -d "$TARGET/.claude/skills/web-designer" ]; then
+    echo "    Note: co-design works best with --with-design-review for post-wave visual review"
+  fi
+fi
+
+# Optional: spark executor (agent profile injection)
+if [ "$WITH_SPARK" = true ]; then
+  echo "  Installing swarm-spark executor..."
+  mkdir -p "$TARGET/.claude/skills/swarm-spark"
+  cp "$WORKFLOW_DIR/.claude/skills/swarm-spark/SKILL.md" "$TARGET/.claude/skills/swarm-spark/SKILL.md"
+  cp "$WORKFLOW_DIR/.claude/commands/swarm-spark.md" "$TARGET/.claude/commands/swarm-spark.md"
+fi
+
 # Optional: Cursor agents
 if [ "$WITH_CURSOR" = true ]; then
   echo "  Installing Cursor agents..."
@@ -130,8 +180,20 @@ echo ""
 echo "Slash commands installed:"
 echo "  /spec         — Discover and specify features"
 echo "  /swarm-plan   — Plan tasks with dependency DAG"
-echo "  /swarm        — Execute tasks with parallel test/dev agents"
+echo "  /swarm        — Execute tasks with parallel test/dev agents (wave-based)"
 echo "  /validate     — Full validation and phase closure"
+if [ "$WITH_SUPER_SWARM" = true ]; then
+  echo "  /super-swarm  — Rolling pool executor (no wave batching, up to 12 concurrent)"
+fi
+if [ "$WITH_TMUX" = true ]; then
+  echo "  /swarm-tmux   — Wave-based execution with live tmux pane visibility"
+fi
+if [ "$WITH_CODESIGN" = true ]; then
+  echo "  /co-design    — Design-aware executor (design/standard task routing)"
+fi
+if [ "$WITH_SPARK" = true ]; then
+  echo "  /swarm-spark  — Agent-profile executor (persona injection)"
+fi
 if [ "$WITH_DESIGN" = true ]; then
   echo "  /design-review — Visual design review (requires running app)"
 fi
