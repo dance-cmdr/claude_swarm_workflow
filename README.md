@@ -21,67 +21,153 @@ The swarm workflow turns feature requests into shipped code through four phases:
 3. **`/swarm`** — Executes tasks in parallel waves using **separated agents**: a Test Agent (Opus) writes failing tests, then a Dev Agent (Sonnet) implements until green. Regression gates run between waves.
 4. **`/validate`** — Full test matrix, regression check, cleanup, code review, documentation updates, and phase closure
 
+### Multi-Agent System: Planning & Parallel Execution
+
 ```mermaid
 flowchart TB
-    subgraph spec["Phase 1: /spec"]
-        s1["Orient\n2-3 questions"] --> s2["Explore\ncodebase"] --> s3["Deep dive\nAC, UX, risks"] --> s4["Generate\nspec doc"]
-    end
+    TITLE["MULTI-AGENT SYSTEM:\nPLANNING & PARALLEL EXECUTION"]
+    TITLE ~~~ SPEC & PLAN & EXEC & VAL
 
-    subgraph plan["Phase 2: /swarm-plan"]
-        p1["Research\narchitecture"] --> p2["Decompose into\natomic tasks"] --> p3["Build dependency\nDAG + waves"] --> p4["Subagent\nreview"]
-    end
-
-    subgraph swarm["Phase 3: /swarm"]
+    subgraph SPEC["PHASE 1: SPECIFICATION (/spec)"]
         direction TB
-        subgraph wave["Each Wave"]
-            direction TB
-            subgraph task["Each Task"]
-                red["Test Agent\n(Opus, RED)\nWrite failing tests"]
-                green["Dev Agent\n(Sonnet, GREEN)\nImplement until green"]
-                red --> green
+        SP1["1. ORIENT\n(What / Why / Type)\n2-3 questions"]
+        SP2["2. CODEBASE EXPLORATION\n(Architecture, patterns,\nexisting tests)"]
+        SP3{"3. CLARIFICATION\nNEEDED?"}
+        SP3Y["Ask User"]
+        SP4["4. FOCUSED DEEP DIVE\n(Acceptance criteria, UX,\nrisks, scope boundaries)"]
+        SP5["5. GENERATE SPEC\n(Structured specification\nwith test plan)"]
+        SP6[("spec.md")]
+
+        SP1 --> SP2 --> SP3
+        SP3 -->|"Yes"| SP3Y --> SP3
+        SP3 -->|"No"| SP4 --> SP5 --> SP6
+    end
+
+    subgraph PLAN["PHASE 2: SWARM-READY PLANNER (/swarm-plan)"]
+        direction TB
+        PL1["1. RESEARCH\n(Codebase Investigation)"]
+        PL1a{"1a. CLARIFICATION?\n(Stop & Ask if unclear)"}
+        PL1aY["Ask User"]
+        PL2["2. DECOMPOSE INTO TASKS\n(Define Tasks & depends_on)"]
+        PL3["3. BUILD WAVE TABLE\n(Dependency DAG → parallel waves)"]
+        PL4["4. SUBAGENT REVIEW\n(Gap Analysis & Revision)"]
+        PL5[("plan.md\n(Finalized)")]
+
+        PL1 --> PL1a
+        PL1a -->|"Yes"| PL1aY --> PL1a
+        PL1a -->|"No"| PL2 --> PL3 --> PL4 --> PL5
+    end
+
+    subgraph EXEC["PHASE 3: PARALLEL TASK EXECUTOR (/swarm)"]
+        direction TB
+        EX1["1. PARSE REQUEST & PLAN\n(Extract Tasks, Dependencies)"]
+        EX2["2. IDENTIFY UNBLOCKED TASKS\n(Wave N: No active depends_on)"]
+        EX3["3. LAUNCH PARALLEL AGENTS"]
+
+        subgraph AGENTS["Parallel Task Execution"]
+            direction LR
+            subgraph AGT1["Task Agent (T1)"]
+                direction TB
+                A1R["Test Agent\n(Opus, RED)"] --> A1G["Dev Agent\n(Sonnet, GREEN)"] --> A1U["Update Plan\n(Log, Commit)"]
             end
-            task --> gate{"Regression\ngate"}
+            subgraph AGT2["Task Agent (T2)"]
+                direction TB
+                A2R["Test Agent\n(Opus, RED)"] --> A2G["Dev Agent\n(Sonnet, GREEN)"] --> A2U["Update Plan\n(Log, Commit)"]
+            end
+            subgraph AGT3["Task Agent (T3)"]
+                direction TB
+                A3R["Test Agent\n(Opus, RED)"] --> A3G["Dev Agent\n(Sonnet, GREEN)"] --> A3U["Update Plan\n(Log, Commit)"]
+            end
         end
-        gate -->|green| next["Next wave\nor final integration"]
-        gate -->|fail| fix["Fix agent\n(Sonnet)"] --> gate
+
+        EX4["4. CHECK & VALIDATE WAVE\n(Regression Gate +\nDesign Gate if CSS)"]
+        EX4F{"Gate\nPassed?"}
+        EX4FIX["Fix Agent\n(Sonnet)"]
+        EX5["5. EXECUTION SUMMARY\n& COMPLETE\n(All tasks verified)"]
+        REPEAT["REPEAT UNTIL\nALL TASKS COMPLETE\n(Next Wave)"]
+
+        EX1 --> EX2 --> EX3 --> AGENTS --> EX4
+        EX4 --> EX4F
+        EX4F -->|"Fail"| EX4FIX --> EX4
+        EX4F -->|"Pass"| REPEAT
+        REPEAT -->|"More waves"| EX2
+        REPEAT -->|"All done"| EX5
     end
 
-    subgraph val["Phase 4: /validate"]
-        v1["Full test\nmatrix"] --> v2["Regression\ncheck"] --> v3["Cleanup +\ncode review"] --> v4["Design review\n(optional)"] --> v5["Phase\nclosure"]
+    subgraph VAL["PHASE 4: VALIDATION (/validate)"]
+        direction TB
+        VL1["1. FULL TEST MATRIX\n(All test types from adapter)"]
+        VL2["2. REGRESSION CHECK\n(Downstream consumers,\nAPI contracts, keybinds)"]
+        VL3["3. CLEANUP\n(Debug statements,\ncommented code, TODOs)"]
+        VL4["4. CODE QUALITY REVIEW\n(Pure functions, assertions,\ndesign tokens, patterns)"]
+        VL5["5. DESIGN REVIEW\n(Web-designer skill, optional)"]
+        VL6["6. FEATURE COMPLETION\nMATRIX"]
+        VL7["7. DOCUMENTATION\nUPDATES"]
+        VL8["8. PHASE CLOSURE\nDOCUMENT"]
+        VL9(["SIGN-OFF\n(Phase ready for closure)"])
+
+        VL1 --> VL2 --> VL3 --> VL4 --> VL5 --> VL6 --> VL7 --> VL8 --> VL9
     end
 
-    spec --> plan --> swarm -->|auto-chain\nvia Stop hook| val
+    SP6 -.->|"input to"| PL1
+    PL5 -.->|"input to"| EX1
+    EX5 ==>|"Stop hook\nauto-chains"| VL1
 
-    adapter[("adapter.md\n(your config)")] -.->|read by| spec
-    adapter -.->|read by| plan
-    adapter -.->|read by| swarm
-    adapter -.->|read by| val
+    ADAPTER[("adapter.md\n(Project Config)")] -.->|"read by all phases"| SPEC
+    ADAPTER -.-> PLAN
+    ADAPTER -.-> EXEC
+    ADAPTER -.-> VAL
 
-    style spec fill:#1a1a2e,stroke:#4a9eff,color:#fff
-    style plan fill:#1a1a2e,stroke:#4a9eff,color:#fff
-    style swarm fill:#1a1a2e,stroke:#4a9eff,color:#fff
-    style val fill:#1a1a2e,stroke:#4a9eff,color:#fff
-    style wave fill:#16213e,stroke:#4a9eff,color:#fff
-    style task fill:#0f3460,stroke:#e94560,color:#fff
-    style red fill:#c0392b,stroke:#922b21,color:#fff
-    style green fill:#27ae60,stroke:#1e8449,color:#fff
-    style gate fill:#f39c12,stroke:#d68910,color:#fff
-    style fix fill:#e67e22,stroke:#ca6f1e,color:#fff
-    style next fill:#27ae60,stroke:#1e8449,color:#fff
-    style adapter fill:#8e44ad,stroke:#6c3483,color:#fff
-    style s1 fill:#2c3e50,stroke:#4a9eff,color:#fff
-    style s2 fill:#2c3e50,stroke:#4a9eff,color:#fff
-    style s3 fill:#2c3e50,stroke:#4a9eff,color:#fff
-    style s4 fill:#2c3e50,stroke:#4a9eff,color:#fff
-    style p1 fill:#2c3e50,stroke:#4a9eff,color:#fff
-    style p2 fill:#2c3e50,stroke:#4a9eff,color:#fff
-    style p3 fill:#2c3e50,stroke:#4a9eff,color:#fff
-    style p4 fill:#2c3e50,stroke:#4a9eff,color:#fff
-    style v1 fill:#2c3e50,stroke:#4a9eff,color:#fff
-    style v2 fill:#2c3e50,stroke:#4a9eff,color:#fff
-    style v3 fill:#2c3e50,stroke:#4a9eff,color:#fff
-    style v4 fill:#2c3e50,stroke:#4a9eff,color:#fff
-    style v5 fill:#2c3e50,stroke:#4a9eff,color:#fff
+    style TITLE fill:#0d1b2a,stroke:#4a9eff,color:#4fc3f7,font-weight:bold
+    style SPEC fill:#0d1b2a,stroke:#4a9eff,color:#fff
+    style PLAN fill:#0d1b2a,stroke:#4a9eff,color:#fff
+    style EXEC fill:#0d1b2a,stroke:#00c853,color:#fff
+    style VAL fill:#0d1b2a,stroke:#4a9eff,color:#fff
+    style AGENTS fill:#1a2744,stroke:#4a9eff,color:#fff
+    style AGT1 fill:#0f3460,stroke:#e94560,color:#fff
+    style AGT2 fill:#0f3460,stroke:#e94560,color:#fff
+    style AGT3 fill:#0f3460,stroke:#e94560,color:#fff
+    style SP1 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style SP2 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style SP3 fill:#1a2744,stroke:#f39c12,color:#e0e0e0
+    style SP3Y fill:#263859,stroke:#f39c12,color:#f39c12
+    style SP4 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style SP5 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style SP6 fill:#8e44ad,stroke:#6c3483,color:#fff
+    style PL1 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style PL1a fill:#1a2744,stroke:#f39c12,color:#e0e0e0
+    style PL1aY fill:#263859,stroke:#f39c12,color:#f39c12
+    style PL2 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style PL3 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style PL4 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style PL5 fill:#8e44ad,stroke:#6c3483,color:#fff
+    style EX1 fill:#1a3a2a,stroke:#00c853,color:#e0e0e0
+    style EX2 fill:#1a3a2a,stroke:#00c853,color:#e0e0e0
+    style EX3 fill:#1a3a2a,stroke:#00c853,color:#e0e0e0
+    style EX4 fill:#1a3a2a,stroke:#00c853,color:#e0e0e0
+    style EX4F fill:#1a3a2a,stroke:#f39c12,color:#e0e0e0
+    style EX4FIX fill:#e67e22,stroke:#ca6f1e,color:#fff
+    style EX5 fill:#1a3a2a,stroke:#00c853,color:#e0e0e0
+    style REPEAT fill:#263859,stroke:#00c853,color:#69f0ae
+    style A1R fill:#c0392b,stroke:#922b21,color:#fff
+    style A1G fill:#27ae60,stroke:#1e8449,color:#fff
+    style A1U fill:#2c3e50,stroke:#4a9eff,color:#e0e0e0
+    style A2R fill:#c0392b,stroke:#922b21,color:#fff
+    style A2G fill:#27ae60,stroke:#1e8449,color:#fff
+    style A2U fill:#2c3e50,stroke:#4a9eff,color:#e0e0e0
+    style A3R fill:#c0392b,stroke:#922b21,color:#fff
+    style A3G fill:#27ae60,stroke:#1e8449,color:#fff
+    style A3U fill:#2c3e50,stroke:#4a9eff,color:#e0e0e0
+    style VL1 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style VL2 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style VL3 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style VL4 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style VL5 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style VL6 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style VL7 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style VL8 fill:#1a2744,stroke:#4a9eff,color:#e0e0e0
+    style VL9 fill:#27ae60,stroke:#1e8449,color:#fff
+    style ADAPTER fill:#8e44ad,stroke:#6c3483,color:#fff
 ```
 
 ### Why Agent Separation?
